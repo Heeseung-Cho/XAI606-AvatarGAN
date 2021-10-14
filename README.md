@@ -10,7 +10,7 @@
 
 ## Dataset
 
-  Faces dataset: we use the VggFace dataset (https://www.robots.ox.ac.uk/~vgg/data/vgg_face/) from the University of Oxford
+  Faces dataset: we use the CelebA dataset (https://mmlab.ie.cuhk.edu.hk/projects/CelebA.html)
 
   Cartoon dataset: we use the CartoonSet dataset from Google (https://google.github.io/cartoonset/), both the versions of 10000 and 100000 items.
   
@@ -45,10 +45,17 @@
 │   ├── discriminator.py
 │   ├── encoder.py
 │   └── __init__.py
+├── pytorch_fid
+│   ├── fid_score.py
+│   ├── inception.py
+│   ├── __init__.py
+│   ├── __main__.py
+│   └── __pycache__
 ├── README.md
 ├── requirements.txt
 ├── scripts
 │   ├── copyFiles.sh
+│   ├── download-cartoon.sh
 │   ├── download_faces.py
 │   ├── keepFiles.sh
 │   ├── plot_utils.py
@@ -82,8 +89,7 @@ Our codebase is in Python3. We suggest creating a new virtual environment.
 1. Change `root_path` in `config.json`. It specifies where is `datasets` which contains the datasets. 
 2. Run `wandb login` to use wandb to get the report
 3. Run `python3 train.py --wandb --run_name <RUN_NAME>` or `python3 train.py --no-wandb`
-4. To launch an agent with a sweep configuration of wandb in bg from ssh `nohup wandb agent --count <RUN_NUMBERS> stevramos/avatar_image_generator/<SWEEP_ID> &`
 
-  You can see the Weights & Biases report here: https://wandb.ai/stevramos/avatar_image_generator
+  You can see the Weights & Biases report here: https://wandb.ai/choheeseung/avatar_image_generator
   
   This is the implementation of [our project](https://madewithml.com/projects/1233/generating-avatars-from-real-life-pictures/) created for the Made With ML Data Science Incubator (deprecated).
