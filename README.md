@@ -13,13 +13,8 @@
   Faces dataset: we use the CelebA dataset (https://mmlab.ie.cuhk.edu.hk/projects/CelebA.html)
 
   Cartoon dataset: we use the CartoonSet dataset from Google (https://google.github.io/cartoonset/), both the versions of 10000 and 100000 items.
+  You can also download from shell file, run `download-cartoon.sh`.
   
-  We filtered out the data just to keep realistic cartoons and faces images. This code is in `scripts`. To download the dataset:
-  
-  1. `pip3 install gdown`
-  2. `gdown https://drive.google.com/uc?id=1tfMW5vZ0aUFnl-fSYpWexoGRKGSQsStL`
-  3. `unzip datasets.zip`
-
 ## Directory structure
 
   `config.json`: contains the model configuration to train the model and deploy the app
