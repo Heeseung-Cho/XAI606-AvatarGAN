@@ -8,10 +8,10 @@ class Encoder(nn.Module):
         super(Encoder, self).__init__()
 
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3,
-                               stride=2, padding=1, bias=False)  # out: 32 x 32 x 32
+                               stride=2, padding=1, bias=False)  # out: 64 x 64 x 32
         self.b1 = nn.BatchNorm2d(32)
         self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3,
-                               stride=2, padding=1, bias=False)  # out: 16 x 16 x 64
+                               stride=2, padding=1, bias=False)  # out: 32 x 32 x 64
         self.b2 = nn.BatchNorm2d(64)
 
         nn.init.kaiming_normal_(self.conv1.weight)
@@ -22,7 +22,6 @@ class Encoder(nn.Module):
         x = self.b1(x)
         x = F.relu(self.conv2(x))
         x = self.b2(x)
-
         return x
 
 

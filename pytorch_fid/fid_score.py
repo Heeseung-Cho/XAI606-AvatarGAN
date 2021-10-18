@@ -243,7 +243,7 @@ def compute_statistics_of_path(path, model, batch_size, dims, device,
     return m, s
 
 
-def calculate_fid_given_paths(paths, batch_size, device, dims, num_workers=1):
+def calculate_fid_given_paths(paths, batch_size, device, dims = 2048, num_workers=1):
     """Calculates the FID of two paths"""
     for p in paths:
         if not os.path.exists(p):

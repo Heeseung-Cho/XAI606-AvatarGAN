@@ -14,6 +14,9 @@ import torchvision.transforms as transforms
 import torchvision
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
+from scipy import linalg
+from torch.nn.functional import adaptive_avg_pool2d
+
 
 from tqdm import tqdm
 from PIL import Image
@@ -21,7 +24,7 @@ from PIL import Image
 import logging
 import random
 
-from keras_segmentation.pretrained import pspnet_50_ADE_20K, pspnet_101_cityscapes, pspnet_101_voc12
+#from keras_segmentation.pretrained import pspnet_50_ADE_20K, pspnet_101_cityscapes, pspnet_101_voc12
 import cv2
 import helper
 import json
@@ -106,7 +109,6 @@ def configure_model(config_file, use_wandb):
         dataset_path_faces=config_file["train_dataset_params"]["dataset_path_faces"],
         dataset_path_cartoons=config_file["train_dataset_params"]["dataset_path_cartoons"],
         dataset_path_test_faces=config_file["train_dataset_params"]["dataset_path_test_faces"],
-        dataset_path_segmented_faces=config_file["train_dataset_params"]["dataset_path_segmented_faces"],
         dataset_path_output_faces=config_file["train_dataset_params"]["dataset_path_output_faces"],
         batch_size=config_file["train_dataset_params"]["loader_params"]["batch_size"],
 
@@ -234,48 +236,49 @@ def get_datasets(root_path, dataset_path_faces, dataset_path_cartoons, batch_siz
     return (train_loader_faces, test_loader_faces, train_loader_cartoons, test_loader_cartoons)
 
 
-def remove_background_image(model, path_filename, output_path):
+# def remove_background_image(model, path_filename, output_path):
 
-    output_file = path_filename.split('/')[-1].split('.')[0] + "_wo_bg.jpg"
+#     output_file = path_filename.split('/')[-1].split('.')[0] + "_wo_bg.jpg"
 
-    out = model.predict_segmentation(
-        inp=path_filename,
-        out_fname=output_path + output_file
-    )
+#     if not os.path.isfile(output_path + output_file):        
+#         out = model.predict_segmentation(
+#             inp=path_filename,
+#             out_fname=output_path + output_file
+#         )
 
-    img_mask = cv2.imread(output_path + output_file)
-    img1 = cv2.imread(path_filename)  # READ BGR
+#         img_mask = cv2.imread(output_path + output_file)
+#         img1 = cv2.imread(path_filename)  # READ BGR
 
-    seg_gray = cv2.cvtColor(img_mask, cv2.COLOR_BGR2GRAY)
-    _, bg_mask = cv2.threshold(
-        seg_gray, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
+#         seg_gray = cv2.cvtColor(img_mask, cv2.COLOR_BGR2GRAY)
+#         _, bg_mask = cv2.threshold(
+#             seg_gray, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
 
-    bg_mask = cv2.cvtColor(bg_mask, cv2.COLOR_GRAY2BGR)
+#         bg_mask = cv2.cvtColor(bg_mask, cv2.COLOR_GRAY2BGR)
 
-    bg = cv2.bitwise_or(img1, bg_mask)
+#         bg = cv2.bitwise_or(img1, bg_mask)
 
-    cv2.imwrite(output_path + output_file, bg)
-
-
-def remove_background(model, path_test_faces, path_segmented_faces):
-
-    path = path_test_faces + 'data/'
-    output_path = path_segmented_faces + 'data/'
-
-    dir_path = os.path.dirname(output_path)
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
-
-    for filename in tqdm(os.listdir(path)):
-
-        remove_background_image(model, path + filename, output_path)
+#         cv2.imwrite(output_path + output_file, bg)
 
 
-def get_test_images(model, batch_size, path_test_faces, path_segmented_faces):
+# def remove_background(model, path_test_faces, path_segmented_faces):
 
-    remove_background(model, path_test_faces, path_segmented_faces)
+#     path = path_test_faces + 'data/'
+#     output_path = path_segmented_faces + 'data/'
 
-    path_test_images = path_segmented_faces
+#     dir_path = os.path.dirname(output_path)
+#     if not os.path.exists(dir_path):
+#         os.makedirs(dir_path)
+
+#     for filename in tqdm(os.listdir(path)):
+
+#         remove_background_image(model, path + filename, output_path)
+
+
+def get_test_images(batch_size, path_test_faces):
+
+    #remove_background(model, path_test_faces, path_segmented_faces)
+
+    path_test_images = path_test_faces
 
     transform_list_faces = get_transforms_config_face()
     transform_list_faces += [transforms.CenterCrop(IMAGE_SIZE)]
@@ -327,9 +330,6 @@ def test_image(model, device, images_faces):
     return output.cpu()
 
 
-            
-
-
 def init_optimizers(model, learning_rate_opDisc, learning_rate_opTotal, learning_rate_denoiser, learning_rate_opCdann):
 
     e1, e2, d1, d2, e_shared, d_shared, c_dann, discriminator1, denoiser = model
@@ -354,3 +354,72 @@ def init_optimizers(model, learning_rate_opDisc, learning_rate_opTotal, learning
     return (optimizerDenoiser, optimizerDisc1, optimizerTotal, crit_opt)
 
 
+def calculate_activation_statistics(images,model,device = None, batch_size=128, dims=2048):
+    model.eval()
+    act=np.empty((len(images), dims))
+    
+    if device is None:
+        batch=images
+    else:
+        batch=images.to(device)
+    pred = model(batch)[0]
+
+        # If model output is not scalar, apply global spatial average pooling.
+        # This happens if you choose a dimensionality not equal 2048.
+    if pred.size(2) != 1 or pred.size(3) != 1:
+        pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
+
+    act= pred.cpu().data.numpy().reshape(pred.size(0), -1)
+    
+    mu = np.mean(act, axis=0)
+    sigma = np.cov(act, rowvar=False)
+    return mu, sigma
+
+def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
+    """Numpy implementation of the Frechet Distance.
+    The Frechet distance between two multivariate Gaussians X_1 ~ N(mu_1, C_1)
+    and X_2 ~ N(mu_2, C_2) is
+            d^2 = ||mu_1 - mu_2||^2 + Tr(C_1 + C_2 - 2*sqrt(C_1*C_2)).
+    """
+
+    mu1 = np.atleast_1d(mu1)
+    mu2 = np.atleast_1d(mu2)
+
+    sigma1 = np.atleast_2d(sigma1)
+    sigma2 = np.atleast_2d(sigma2)
+
+    assert mu1.shape == mu2.shape, \
+        'Training and test mean vectors have different lengths'
+    assert sigma1.shape == sigma2.shape, \
+        'Training and test covariances have different dimensions'
+
+    diff = mu1 - mu2
+
+    
+    covmean, _ = linalg.sqrtm(sigma1.dot(sigma2), disp=False)
+    if not np.isfinite(covmean).all():
+        msg = ('fid calculation produces singular product; '
+               'adding %s to diagonal of cov estimates') % eps
+        print(msg)
+        offset = np.eye(sigma1.shape[0]) * eps
+        covmean = linalg.sqrtm((sigma1 + offset).dot(sigma2 + offset))
+
+    
+    if np.iscomplexobj(covmean):
+        if not np.allclose(np.diagonal(covmean).imag, 0, atol=1e-3):
+            m = np.max(np.abs(covmean.imag))
+            raise ValueError('Imaginary component {}'.format(m))
+        covmean = covmean.real
+
+    tr_covmean = np.trace(covmean)
+
+    return (diff.dot(diff) + np.trace(sigma1) +
+            np.trace(sigma2) - 2 * tr_covmean)
+
+def calculate_fretchet(images_real,images_fake,model, device):
+     mu_1,std_1=calculate_activation_statistics(images_real,model,device=device)
+     mu_2,std_2=calculate_activation_statistics(images_fake,model,device=device)
+    
+     """get fretched distance"""
+     fid_value = calculate_frechet_distance(mu_1, std_1, mu_2, std_2)
+     return fid_value

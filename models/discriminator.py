@@ -9,15 +9,15 @@ class Discriminator(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=16,
-                               kernel_size=3, stride=2, padding=1)  # out: 32 x 32 x 32
+                               kernel_size=3, stride=2, padding=1)  # out: 32 x 32 x 16
         self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3,
-                               stride=2, padding=1, bias=False)  # out: 32 x 32 x 32
+                               stride=2, padding=1, bias=False)  # out: 16 x 16 x 32
         self.b2 = nn.BatchNorm2d(32)
         self.conv3 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3,
-                               stride=2, padding=1, bias=False)  # out: 32 x 32 x 32
+                               stride=2, padding=1, bias=False)  # out: 8 x 8 x 32
         self.b3 = nn.BatchNorm2d(32)
-        self.conv4 = nn.Conv2d(in_channels=32, out_channels=32,
-                               kernel_size=3, stride=2, padding=1)  # out: 32 x 32 x 32
+        self.conv4 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3,
+                               stride=2, padding=1, bias=False)  # out: 4 x 4 x 32
         self.flatten = nn.Flatten()
         self.fc1 = nn.Linear(in_features=4*4*32, out_features=1)
 

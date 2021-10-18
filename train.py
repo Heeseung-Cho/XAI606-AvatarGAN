@@ -19,6 +19,7 @@ def train(config_file, use_wandb, run_name, run_notes):
     
     
     xgan = Avatar_Generator_Model(config, use_wandb)
+    xgan.load_weights(config.model_path)
     xgan.train()
 
 

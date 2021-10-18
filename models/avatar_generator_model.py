@@ -6,6 +6,9 @@ import torchvision
 from torch.autograd import Variable
 from PIL import Image
 from keras_segmentation.pretrained import pspnet_101_voc12
+from pytorch_fid.inception import InceptionV3
+from pytorch_fid.fid_score import calculate_fid_given_paths
+#from facenet_pytorch import InceptionResnetV1
 import cv2
 import numpy as np
 
@@ -36,11 +39,11 @@ class Avatar_Generator_Model():
     def __init__(self, config, use_wandb=True):
         self.use_wandb = use_wandb
         self.config = config
-        self.device = torch.device("cuda:" + (os.getenv('N_CUDA')if os.getenv('N_CUDA') else "0") if self.config.use_gpu and torch.cuda.is_available() else "cpu")
-        
         self.segmentation = pspnet_101_voc12()
-        self.e1, self.e2, self.d1, self.d2, self.e_shared, self.d_shared, self.c_dann, self.discriminator1, self.denoiser = self.init_model(self.device, self.config.dropout_rate_eshared, self.use_wandb)
-        
+        self.device = torch.device("cuda:" + (os.getenv('N_CUDA')if os.getenv('N_CUDA') else "0") if self.config.use_gpu and torch.cuda.is_available() else "cpu")        
+        self.e1, self.e2, self.d1, self.d2, self.e_shared, self.d_shared, self.c_dann, self.discriminator1, self.denoiser, self.inception_model = self.init_model(self.device, self.config.dropout_rate_eshared, self.use_wandb)
+        #self.resnet = InceptionResnetV1(pretrained='vggface2',classify = True,num_classes = 1024).to(self.device)
+
 
     def init_model(self, device, dropout_rate_eshared, use_wandb=True):
         
@@ -54,6 +57,8 @@ class Avatar_Generator_Model():
         c_dann = Critic()
         discriminator1 = Discriminator()
         denoiser = Denoiser()
+        block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[2048]
+        inception_model = InceptionV3([block_idx])
 
         e1.to(device)
         e2.to(device)
@@ -64,7 +69,8 @@ class Avatar_Generator_Model():
         c_dann.to(device)
         discriminator1.to(device)
         denoiser = denoiser.to(device)
-
+        inception_model = inception_model.to(device)
+        
         if use_wandb:
             wandb.watch(e1, log="all")
             wandb.watch(e2, log="all")
@@ -76,7 +82,7 @@ class Avatar_Generator_Model():
             wandb.watch(discriminator1, log="all")
             wandb.watch(denoiser, log="all")
 
-        return (e1, e2, d1, d2, e_shared, d_shared, c_dann, discriminator1, denoiser)
+        return (e1, e2, d1, d2, e_shared, d_shared, c_dann, discriminator1, denoiser, inception_model)
 
 
     def generate(self, path_filename, output_path):
@@ -332,8 +338,8 @@ class Avatar_Generator_Model():
             loss_sem2 = L1_norm(cartoons_encoder.detach(), faces_construct_encoder)
             loss_sem = loss_sem1 + loss_sem2
 
-            # teach loss
-            #faces_embedding = resnet(faces_batch.squeeze())
+            # teach loss, If you want to use teacher loss, import facenet-pytorch and set up.
+            #faces_embedding = self.resnet(faces_batch.squeeze())
             #loss_teach = L1_norm(faces_embedding.squeeze(), faces_encoder)
             # constant until train facenet
             loss_teach = torch.Tensor([1]).requires_grad_()
@@ -390,6 +396,7 @@ class Avatar_Generator_Model():
 
             optimizerDenoiser.step()
 
+
         return loss_rec1, loss_rec2, loss_dann, loss_sem1, loss_sem2, loss_disc1, loss_gen1, loss_total, loss_denoiser, loss_teach, loss_disc1_real_cartoons, loss_disc1_fake_cartoons
 
 
@@ -412,7 +419,7 @@ class Avatar_Generator_Model():
 
         model = (self.e1, self.e2, self.d1, self.d2, self.e_shared, self.d_shared, self.c_dann, self.discriminator1, self.denoiser)
 
-        train_loader_faces, test_loader_faces, train_loader_cartoons, test_loader_cartoons = get_datasets(self.config.root_path, self.config.dataset_path_faces, self.config.dataset_path_cartoons, self.config.batch_size)
+        train_loader_faces, valid_loader_faces, train_loader_cartoons, valid_loader_cartoons = get_datasets(self.config.root_path, self.config.dataset_path_faces, self.config.dataset_path_cartoons, self.config.batch_size)
         optimizers = init_optimizers(model, self.config.learning_rate_opDisc, self.config.learning_rate_opTotal, self.config.learning_rate_denoiser, self.config.learning_rate_opCdann)
 
 
@@ -424,7 +431,7 @@ class Avatar_Generator_Model():
         criterion_l1.to(self.device)
         criterion_l2.to(self.device)
 
-        images_faces_to_test = get_test_images(self.segmentation, self.config.batch_size, self.config.root_path + self.config.dataset_path_test_faces, self.config.root_path + self.config.dataset_path_segmented_faces)
+        images_faces_to_test = get_test_images(self.config.batch_size, self.config.root_path + self.config.dataset_path_test_faces)
 
         for epoch in tqdm(range(self.config.num_epochs)):
             loss_rec1, loss_rec2, loss_dann, loss_sem1, loss_sem2, loss_disc1, loss_gen1, loss_total, loss_denoiser, loss_teach, loss_disc1_real_cartoons, loss_disc1_fake_cartoons = self.train_step(train_loader_faces, train_loader_cartoons, optimizers, criterion_bc, criterion_l1, criterion_l2)
@@ -449,11 +456,19 @@ class Avatar_Generator_Model():
                 except OSError:
                     pass
                 save_weights(model, path_save_epoch, self.use_wandb)
-                loss_test = self.get_loss_test_set(test_loader_faces, test_loader_cartoons, criterion_bc, criterion_l1, criterion_l2)
-                generated_images = test_image(model, self.device, images_faces_to_test)
-                
-                metrics_log["loss_total_test"] = loss_test
+                loss_valid = self.get_loss_test_set(valid_loader_faces, valid_loader_cartoons, criterion_bc, criterion_l1, criterion_l2)
+                dataiter_faces = iter(valid_loader_faces)
+                dataiter_cartoons = iter(valid_loader_cartoons)
+                valid_faces = dataiter_faces.next()
+                valid_cartoons = dataiter_cartoons.next()
+                generated_images = test_image(model, self.device, valid_faces)
+
+                # FID(Fretchet Inception Distsance)            
+                fretchet_dist= calculate_fretchet(valid_cartoons[0],generated_images,self.inception_model, self.device) 
+
+                metrics_log["loss_total_valid"] = loss_valid
                 metrics_log["Generated images"] = [wandb.Image(img) for img in generated_images]
+                metrics_log["FID"] = fretchet_dist
 
             if self.use_wandb:
                 wandb.log(metrics_log)

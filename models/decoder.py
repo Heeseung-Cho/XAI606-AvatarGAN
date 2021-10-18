@@ -40,7 +40,7 @@ class Decoder(nn.Module):
             in_channels=64, out_channels=3, kernel_size=2, stride=2)
 
         nn.init.kaiming_normal_(self.deconv3.weight)
-        nn.init.kaiming_normal_(self.deconv4.weight)
+        nn.init.kaiming_normal_(self.deconv4.weight)        
         nn.init.xavier_normal_(self.deconv5.weight)
 
     def forward(self, x):
