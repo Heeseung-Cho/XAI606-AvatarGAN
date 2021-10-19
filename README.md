@@ -9,11 +9,16 @@
    Based on the paper XGAN: https://arxiv.org/abs/1711.05139
 
 ## Dataset
+  Cartoon dataset: we use the CartoonSet dataset from Google (https://google.github.io/cartoonset/), both the versions of 10000 and 100000 items.
+  You can download from shell file, run `download-cartoon.sh`.
 
   Faces dataset: we use the CelebA dataset (https://mmlab.ie.cuhk.edu.hk/projects/CelebA.html)
+  
+  Also, you can use another face datasets such as 
+  
+  1) VggFace dataset (https://www.robots.ox.ac.uk/~vgg/data/vgg_face/) from the University of Oxford
+  2) FFHQ dataset (https://github.com/NVlabs/ffhq-dataset) from NVIDIA.
 
-  Cartoon dataset: we use the CartoonSet dataset from Google (https://google.github.io/cartoonset/), both the versions of 10000 and 100000 items.
-  You can also download from shell file, run `download-cartoon.sh`.
   
 ## Directory structure
 
@@ -87,4 +92,9 @@ Our codebase is in Python3. We suggest creating a new virtual environment.
 
   You can see the Weights & Biases report here: https://wandb.ai/choheeseung/avatar_image_generator
   
-  This is the implementation of [our project](https://madewithml.com/projects/1233/generating-avatars-from-real-life-pictures/) created for the Made With ML Data Science Incubator (deprecated).
+## Evaluation
+Fréchet Inception Distance will be used for our task evaluation.
+
+FID is a measure of similarity between two datasets of images. It was shown to correlate well with human judgement of visual quality and is most often used to evaluate the quality of samples of Generative Adversarial Networks. FID is calculated by computing the Fréchet distance between two Gaussians fitted to feature representations of the Inception network.
+
+You can see the details in https://github.com/mseitzer/pytorch-fid.
