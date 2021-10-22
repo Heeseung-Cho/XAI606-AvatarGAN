@@ -19,7 +19,8 @@
   1) VggFace dataset (https://www.robots.ox.ac.uk/~vgg/data/vgg_face/) from the University of Oxford
   2) FFHQ dataset (https://github.com/NVlabs/ffhq-dataset) from NVIDIA.
 
-  
+  You can get sampled data from https://drive.google.com/file/d/1A9CRETxqugKr1ae7G1ICIqO8u7ST5_SP/view?usp=sharing,
+  but recommend to use total dataset if you can.
 ## Directory structure
 
   `config.json`: contains the model configuration to train the model and deploy the app
